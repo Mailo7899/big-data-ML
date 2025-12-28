@@ -1,0 +1,922 @@
+---
+title: "tesina_04_11_2021"
+author: "millone"
+date: "4/11/2021"
+output: word_document
+---
+### PROGETTO MILLONE, ROSSI E ZANINI (STATISTICA COMPUTAZIONALE)
+  
+Il nostro dataset mostra i prezzi delle auto in base a determinate caratteristiche e fattori; vogliamo capire i fattori che influenzano i prezzi delle auto nel mercato.
+Puntiamo a trovare quali variabili sono significative nella previsione del prezzo di un'auto e quanto bene queste variabili descrivono bene il prezzo di un'auto.
+Il nostro dataset presenta le seguenti variabili:
+
+Car_ID: id unico di ogni osservazione 
+Symboling (categoriale): è il rischio assicurativo assegnato ad ogni auto, un valore di +3 indica che l'auto è rischiosa, di -3 che probabilmente è abbastanza sicura.
+carName (categoriale): nome del modello dell'auto
+fueltype (categoriale): nome del tipo di carburante
+aspiration (categoriale): tipo di aspirazione dell'auto
+doornumber (categoriale): numero di portiere 
+carbody (categoriale): tipo di carrozzeria
+drivewheel (categoriale): tipo di ruota motrice
+enginelocation (categoriale): locazione del motore
+wheelbase (numerica): passo della macchina (distanza tra ruota anteriore e posteriore)
+carlength (numerica): lunghezza dell'auto
+carwidth (numerica): larghezza della macchina
+carheight (numerica): altezza della macchina
+curbweight (numerica): peso dell'auto senza passeggeri o bagagli
+enginetype (categoriale): tipo di motore
+cylindernumber (categoriale): numero di cilindri
+enginesize (numerica): dimensione dell'auto
+fuelsystem (categoriale): sistema di alimentazione
+boreratio (numerica): termine per descrivere il rapporto tra il diametro dell'alesaggio del cilindro e la lunghezza della corsa del pistone
+stroke (numerica): cilindrata dell'auto
+compressionratio (numerica): rapporto di compressione, cioè rapporto tra il volume del cilindro e la camera di combustione
+horsepower (numerica): cavalli della macchina
+peakrpm (numerica): picco di giri per minuto
+citympg (numerica): numero di miglia percorsi in città 
+highwaympg (numerica): numero di miglia percorsi in autostrada
+price (variabile target): prezzo del veicolo
+
+Per creare un modello robusto della variabile target prezzo eseguiamo i seguenti passaggi in ordine:
+
+0. Controllo dati mancanti ed eventuale imputazione per una corretta escuzione del lavoro.
+1. Correggere la collinearità tra i dati affinchè esistano le stime dei parametri, XtraspostoX non sarebbe singolare e non invertibile.
+2. Trasformazione di box-cox per il target e eventuali trasformazioni per le covariate per rendere lineare il nostro modello e migliorarne l'adattamento ai dati.
+3. Model Selection, scegliere le migliori variabili per migliorare la linearità e l'eteroschedasticità.
+4. Outliers e punti influenti, eliminare tali punti che potrebbero distorcere il modello da una corretta analisi.
+5. Eteroschedasticità, cercare di eliminarla al meglio per una corretta inferenza.
+6. Valutazioni finali, modello iniziale vs modello finale 
+
+
+```{r}
+options(scipen=999)
+library(readr)
+CarPrice_Assignment <- read_csv("CarPrice_Assignment.csv")
+b <- CarPrice_Assignment
+```
+
+Iniziamo eliminando le variabili che riteniamo non utili per lo studio del modello: car_ID, carName, enginetype enginelocation doornumber
+
+
+# vediamo le statistiche descrittive per farci un'idea generale
+
+```{r}
+summary(b)
+require(skimr)
+skim(b)
+
+```
+Dalle statistiche descrittive notiamo che la lunghezza della macchina, il rapporto tra il diametro dell'alesaggio del cilindro e la lunghezza della corsa del pistone, il rapporto di compressione e la cilindrata e il numero di miglia percorsi in città e in autostrada hanno media e mediana coincidenti.
+
+Si vede che il peso dell'auto senza passeggeri o bagagli, il picco di giri per minuto e il prezzo hanno alta deviazione standard.
+
+Si vede una simmetria tra la mediana con il primo e terzo quartile per le variabili altezza e lunghezza della macchina.
+Notiamo invece forte asimmetrica per il prezzo, il rapporto di compressione e i cavalli delle auto.
+
+
+controlliamo che le variabili siano correttamente divise in numeric e factor
+
+```{r}
+
+b$symboling=as.factor(b$symboling)
+class(b$symboling)
+summary(b$symboling)
+
+b$CarName=as.factor(b$CarName)
+class(b$symboling)
+
+b$fueltype=as.factor(b$fueltype)
+class(b$fueltype)
+
+b$aspiration=as.factor(b$aspiration)
+class(b$aspiration)
+
+b$doornumber=as.factor(b$doornumber)
+class(b$doornumber)
+
+b$carbody=as.factor(b$carbody)
+class(b$carbody)
+
+b$drivewheel=as.factor(b$drivewheel)
+class(b$drivewheel)
+
+b$enginelocation=as.factor(b$enginelocation)
+class(b$enginelocation)
+
+b$enginetype=as.factor(b$enginetype)
+class(b$enginetype)
+
+b$cylindernumber=as.factor(b$cylindernumber)
+class(b$cylindernumber)
+
+b$fuelsystem=as.factor(b$fuelsystem)
+class(b$fuelsystem)
+
+```
+
+Iniziamo eliminando le variabili che riteniamo non identificative per lo studio del modello: car_ID, carName, enginetype enginelocation doornumber.
+Car_ID poichè indica solamente la posizione dell'osservazione, CarName perchè è una variabile categoriale con un grandissimo numero di livelli.
+
+```{r}
+b1 <- b[, -c(6,9,15)]
+b2 <- b1[, -c(1,3)]
+```
+
+
+```{r}
+library(funModeling)
+library(dplyr)
+
+```
+
+
+```{r}
+status=df_status(b2, print_results = F)
+status#ci permette di vedere le tipologie delle varibili ,cosi da verificare la loro congrtuneza 
+
+```
+
+
+Adesso stimiamo un primo modello con tutte le variabili 
+
+```{r}
+fit = lm(price ~ . , data=b)
+summary(fit)
+```
+Abbiamo un grande numero di covariate e livelli delle categoriali non significative.
+L'R quadro è molto elevato (0.99 vicino a 1) ma ciò è dovuto al grande numero di covariate.
+
+Si osserva la presenza di alta collinearità fra le singole covariate. 
+
+
+```{r}
+length(fit$residuals)
+nrow(b2)#205 corrisponde a 205 
+```
+
+Abbiamo visto che il numero dei residui del primo modello corrisponde al numero di righe dell'intero dataset (205),
+questo ci porta ad affermare con certezza la non presenza di dati mancanti.
+
+
+```{r}
+sapply(b2, function(x)(sum(is.na(x)))) # NA counts
+
+```
+
+Visto che non ci sono dati mancanti possiamo guardare subito la linearita del modello, se ci fossero stati dati mancanti prima bisognava a vedere se ci fosse stata collinearità perchè se no provocherebbe degli errori nell'imputazione. 
+
+si puo notare anche da visione grafica 
+
+
+```{r}
+library(VIM)
+missingness<- aggr(b, col=c('navyblue','yellow'),numbers=TRUE, sortVars=TRUE,labels=names(b), cex.axis=.7,gap=2)
+
+```
+
+
+Si vede che in tutte le colonne,le covariate, non c'è presenza di dati mancanti. 
+
+####1.  AFFRONTIAMO COLLINEARITA#####
+
+La collinearità è un problema per la stima dei parametri e per gli standard error. (se R quadro tende a uno, standard error tende a infinito poichè standard error è funzione inversa della correlazione tra le covariate)
+Una prima idea sulla collinearità si può avere guardando il grafico delle correlazioni, però questo non ci da una visione completa si potrebbe nascondere una relazione tra una covariata e coppie di covariate con una loro combinazione. La cosa migliore è calcolare le metriche VIF e TOL e eliminare quelle con tolleranza sotto 0.3. La tolleranza è la parte di varianza di una covariata non spiegata dalle altre covariate.
+
+
+
+```{r}
+fac <- b2%>% dplyr::select_if(is.factor)#comando comodo perche viene la stessa cosa di factordata
+
+
+sapply(fac, function(x) length(levels(x)))#ce anche variabile proice dipendente 
+```
+
+Si osserva che nessuna variabile factor ha un solo livello (e quindi zero variance) perciò manteniamo tutte le variabili fattoriali.
+
+```{r}
+numeric <- b2%>% dplyr::select_if(is.numeric)#si fa con unico comnado perche tanto viene come numdata
+```
+
+```{r}
+sapply(numeric, function(x) var(x))#con option=999 tolgo scrittura scientifica tipo 4*e alla -30
+
+```
+
+Si osserva che nessuna variabile numerica ha varianza pari a zero.
+
+Le variabili BORERATIO e STROKE hanno varianza minima (rispettivamente 0.07 e 0.10), ma non pari a zero.
+
+Stimiamo un nuovo modello con le variabili identificative.
+
+```{r}
+Formula_fac <- paste(colnames(fac), collapse="','")
+Formula_fac
+
+Formula_num <- paste(colnames(numeric), collapse="','")
+Formula_num
+
+```
+
+
+```{r}
+list=c('symboling','fueltype','carbody','drivewheel', 'cylindernumber','fuelsystem', 'aspiration',
+       'wheelbase','carlength','carwidth','carheight','curbweight','enginesize',
+       'boreratio','stroke','compressionratio','horsepower','peakrpm','citympg','highwaympg')
+list
+
+
+```
+
+
+```{r}
+fit2 = lm(price~symboling + fueltype + carbody + drivewheel + cylindernumber + fuelsystem + 
+            aspiration + wheelbase + carlength + carwidth + carheight + curbweight + 
+            enginesize + boreratio + stroke + compressionratio + horsepower + peakrpm + 
+            citympg + highwaympg , data=b2)
+summary(fit2)
+
+par(mfrow=c(2,2))
+plot(fit2)  #Warning message: not plotting observations with leverage one: 19, 30, 47, 50, 59
+par(mfrow=c(1,1))
+
+```
+In questo nuovo modello notiamo che i quattro livelli della variabile categoriale carrozzeria sono significativi, e inoltre anche la cilindrata e le dimensioni della macchina sono significative. L'R quadro è leggermente diminuito, da 0.99 a 0.9.
+
+
+#il modello ÃÂ¨ decisamente migliorabile
+
+#dopo aver creato il modello, si osserva una collinearitÃÂ  ancora molto alta, procediamo
+#a calcolare il VIF e il TOL. Nel caso in cui si verifichino valori "drammatici", procederemo
+#a svolgere la model selection in modo da contenere la multicollinearitÃÂ .
+
+# collinearitÃÂ : sia per x continue (plot, tol, vif), sia per x qualitative (chi quadro)
+#iniziamo con le variabili continue
+
+
+```{r}
+require(corrgram)
+corrgram(numeric, lower.panel = panel.cor, cex=1, cex.labels = 1)
+
+```
+
+
+#mostra mtrice grafica correlazioni con triangolo inferiore sx con valori e triangolo alto dx con tonalita fredde e calde
+
+#dal grafico osserviamo valori alti positivi tra le covariate che misurano le dimensioni
+#della macchina. In particolare tra "wheelbase" e "carlenght" (0.87) e tra "carlength" e
+# "curbweight" (0.88).
+#Si osservano valori alti negativi fra la variabile "horsepower" e le variabili 
+#"citympg" (0.80) e "highwaympg" (0.77)
+
+
+#stsso comando di quello di sopra con tutte le covariate numeriche ma questo utilizza dt iniziale 
+
+
+#si fa lo stesso per far notare una grafica dello scenario complessivo con matrice correlazione delle quantitaive
+
+
+```{r}
+library(PerformanceAnalytics)#diagnosticghe grafiche ,diagnoale histogrammi,sopra istog abbaimo correlazioni,sotto stogr abbaimo dispersioni con loess linea rossa 
+chart.Correlation( numeric, histogram=TRUE, pch=19)#con slo dataset dati quantitativi
+
+
+
+
+
+y = as.numeric(b2$price)
+x<-numeric
+X=as.matrix(x)
+
+library(mctest)
+mod <- lm(y~X)
+imcdiag(mod)
+
+```
+
+
+
+#dati i valori di vif e tol ottenuti (i quali indicano forte collinearitÃÂ  fra le variabili, 
+#andiamo a svolgere la model selection al fine di ridurre la multicollinearitÃÂ )
+
+
+#####3.   MODEL SELECTION: creiamo il nostro modello con la procedura STEPAIC che utilizza####
+#come misura per scegliere i parametri da mettere e togliere la misura robusta AIC.
+
+
+```{r}
+
+library(MASS)
+step <-stepAIC(fit2, direction="both")
+
+
+
+
+
+
+starting_model = lm(price ~ carbody + drivewheel + cylindernumber + aspiration + 
+                      carwidth + carheight + enginesize + boreratio + stroke + 
+                      peakrpm + citympg + highwaympg, data=b2)
+
+drop1(starting_model, test="F")
+summary(starting_model)
+
+```
+
+
+#si crea il dataset solamente con le variabili che hanno restituito il valore di 
+#tutte le variabili sono significative, eccetto boreratio,
+
+
+```{r}
+step$anova # display results 
+
+length(fit2$residuals)
+length(starting_model$residuals)#devnono dare lo stesso risultato infatti 205 osservazioni 
+
+
+```
+
+
+
+# diamo un'occhiata ai plot di diagnostica del nostro modello
+```{r}
+
+par(mfrow=c(2,2)) 
+plot(starting_model)
+par(mfrow=c(1,1))
+
+```
+
+
+#Si puo notare che la linearitÃÂ  ÃÂ¨ migliorata, etero ce ancora un po di presenza,
+#la normalita dei residui si vede che e quasi rispettata
+#poi ce presenza di valori outlier e 1 punto influente 
+
+
+#valutiamo i nuovi tol e vif del modello creato con la model selection
+
+#creiamo il nuovo dataset solamente con le variabili mantenute dalla model selection
+
+
+
+```{r}
+b_mod_sel <- b2[,-c(1,2,6,7,10,13,16,17)];b_mod_sel
+num_mod_sel <- sapply(b_mod_sel, function(x) is.numeric(x));num_mod_sel
+num_mod_sel <- b_mod_sel[, num_mod_sel]
+
+
+
+
+
+
+
+y_ms = as.numeric(b_mod_sel$price)
+x_ms<-numeric[,-c(1,2,5,9,10)]
+X_ms=as.matrix(x_ms)
+
+library(mctest)
+lm_ms <- lm(y_ms~X_ms)
+imcdiag(lm_ms)
+```
+
+
+
+#X_mshighwaympg 20.5813 0.0486  togliamola
+
+
+#dopo aver effettuato la model selection, si osserva che le variabili CITYMPG e HIGHWAYMPG
+#hanno valor ancora elevati di VIF. Queste due variabili sono fortemente collineari 
+#poichÃÂ¨ indicano una il numero di km percorsi in cittÃÂ  e l'altra il numero di km percorsi
+#su autostrada, ÃÂ¨ logico aspettarsi che queste due variabili siano collineari. 
+#Si decide di eliminare dal dataset la variabile HIGHWAYMPG e poi ricalcoliamo i valori
+#di VIF e TOL.
+
+```{r}
+b_ms2 <- b_mod_sel[,-c(12)]
+
+y_ms2 = as.numeric(b_ms2$price)
+x_ms2<-x_ms[,-c(8)]
+X_ms2=as.matrix(x_ms2)
+
+library(mctest)
+lm_ms2 <- lm(y_ms2~X_ms2);
+imcdiag(lm_ms2)
+```
+
+
+
+
+#enginesize 6.0423 0.1655
+
+```{r}
+b_ms3 <- b_ms2[,-c(7)]
+
+y_ms3 = as.numeric(b_ms3$price)
+x_ms3<-x_ms2[,-c(3)]
+X_ms3=as.matrix(x_ms3)
+
+library(mctest)
+lm_ms3 <- lm(y_ms3~X_ms3);
+imcdiag(lm_ms3);lm_ms3
+```
+
+
+
+#tolta tutta la collinearita  nelle continue 
+
+continue :
+  X_ms3carwidth  
+X_ms3carheight 
+X_ms3boreratio 
+X_ms3stroke   
+X_ms3peakrpm   
+X_ms3citympg  
+X_ms3price     
+
+fattori:
+  aspiration        carbody     drivewheel       cylindernumber 
+FALSE    FALSE         FALSE             FALSE 
+
+
+
+
+#collinearita dei fattori ,attraverso la statistica chi-quadro
+
+
+#guardiamo la multicollinearitÃÂ  tra le variabili factor con il chi quadro normalizzato
+
+
+
+
+### n_used
+
+```{r}
+n_used2=length(fit2$residuals)#quante righe lavora dataset 
+n_used2
+nrow(b2)#doverbbero venire gli stessi risultati tar nrow e n_used (b2 e dt con qualche colonna in meno )
+
+```
+
+
+#205 tutte e due 
+
+
+
+#non si presentano chi_quadro normalizzati maggiori di 0.8 
+
+#otteniamo un valore di chi square normalizzato pari a 0.07, si puÃÂ² affermare 
+#che non vi ÃÂ¨ nessuna associazione fra queste variabili.
+
+
+
+
+
+
+
+#fittiamo il nostro modello ottenuto con le variabili scelte dalla procedura stepAIC,  e vif/tol e chi-qudro
+#tolte symboling,fuelsystem per le categoriali ,per le conotinue togliamo carlength curbweight compressionratio + horsepowe enginesize ed highwaympg
+
+
+
+```{r}
+starting_model3 <- lm(price ~ carbody + drivewheel + cylindernumber + aspiration + 
+                        carwidth + carheight  + boreratio + stroke + 
+                        peakrpm + citympg ,data=b_ms3)
+summary(starting_model3)#quasi tutte sono significastive 
+drop1(starting_model3, test='F')#solo stroke e city mpg non sono significative 
+
+par(mfrow=c(2,2)) 
+plot(starting_model3)
+par(mfrow=c(1,1)) #CAPIRE PERCHÃÂ¨ DA ERRORE!!!!!!!!!!!!!!!!!!!
+
+
+```
+
+
+######2.  TRASFORMAZIONE BOX-COX FOR Y  AND GAM FOR X#####
+# transfor box cox
+
+
+```{r}
+library(MASS)
+boxcoxreg1<-boxcox(starting_model3)
+title("Lambda")
+lambda=boxcoxreg1$x[which.max(boxcoxreg1$y)]
+lambda#viene fuori un lambda da -0.222 ,non ci aiuta sto valore 
+
+```
+
+
+#i lambda che potrebbero servirci per una ricerca adguata sono -1,0.5,2 e non valori con la virgola (comunque i lambda hanno range [-4;4])
+#quindi in questo caso non possimao usarlo perche ha un lambda non adeguato  
+
+#osserviamo dal grafico di Box e Cox che lambda ÃÂ¨ vicino a 0 (circa -0.10), 
+#quindi optiamo per una trasformazione logaritmica (di tipo log-lineare, 
+#la variabile ÃÂ¨ stata trasformata con il logaritmo, mentre tutte le covariate 
+#sono rimaste lineari)
+
+
+```{r}
+starting_model_log <- lm(log(price+1) ~ carbody + drivewheel + cylindernumber + 
+                           aspiration + carwidth + carheight  + boreratio 
+                         + stroke + peakrpm + citympg , data=b_ms3)
+#anche qua cera enginesize dopo carwidth ,lo tolto ,anche highwaympg togliamo 
+#+1 sulla target per evitare di creaRE disordni nella procedura del logaritmo con valori <=0
+summary(starting_model3)#Multiple R-squared:  0.8567,maggior parte varibili significative 
+summary(starting_model_log)#Multiple R-squared:  0.8885,miglora leggermente,maggiorparte varibilÃ²i significative  
+
+```
+
+
+
+
+
+
+
+
+```{r}
+b_ms3$inv=1/(b_ms3$price+1)
+lm_inverso = lm( inv~ carbody + drivewheel + cylindernumber + 
+                   aspiration + carwidth + carheight  + boreratio 
+                 + stroke + peakrpm + citympg , data=b_ms3)
+summary(lm_inverso)#Multiple R-squared:  0.8488
+
+```
+
+
+
+
+# model diagnostic con starting_model_log (price trasformata in log(price))
+
+```{r}
+par(mfrow=c(2,2)) 
+plot(starting_model_log)
+par(mfrow=c(1,1)) 
+
+```
+
+
+#si osserva ottima linearitÃÂ  tra i residui e valori fittati,grafico q q plot e molto migliorato quantili teorici e osservati coincidono e in piu etero e migliorata molto la loess e diventata quasi piatta
+
+#lavoro su gma e poi vedo diagnostiche ####
+
+```{r}
+library(mgcv)
+
+starting_model_log <- lm(log(price+1) ~ carbody + drivewheel + cylindernumber + 
+                           aspiration + carwidth + carheight  + boreratio 
+                         + stroke + peakrpm + citympg , data=b_ms3)
+
+str(b_ms3)
+```
+
+
+
+#metto s( ) su varibili quantitative numeriche 
+
+```{r}
+gam_modlog = gam(log(price+1) ~ carbody + drivewheel + cylindernumber + 
+                   aspiration + s(carwidth) + s(carheight) + s(boreratio) 
+                 + s(stroke)  + s(peakrpm)+s(citympg) , data=b_ms3)
+summary(gam_modlog)#BISOGNA VEDERE SE GIUSTA ASSEGNAzione a varibili quantitative#
+
+```
+
+
+
+#bisogna fare confronto d ipotesi con formula seguente 
+
+```{r}
+anova(starting_model_log, gam_modlog, test="LRT")
+
+```
+
+
+# refuse H0 that the model have same fit/error (RSS):  here gam is best.
+#si rifiuta ho quando abbiamo stessi(same) fit error ,RSS
+
+
+
+
+#significative tutte  tranne carheigth ,livelli drive e cylindernumber 
+
+```{r}
+summary(gam_modlog)
+
+```
+
+
+
+
+# this means that although gam of X are useful for Y 
+# there are no more useful for logY (X are linear with logY)
+
+#diagramma 
+
+```{r}
+par(mfrow=c(2,2)) 
+plot(gam_modlog)#PLOT CHE NE DEDUCIAMO ESPONENTE O INVERSA*/LOGARITMAZA SU COVARIATE ,MOSTRA ALCUNE COVARIATE DI COME HANNO IL LORO ANDAMENTO QUIDI DAL GRAFICO POSSIAMO CAPIRE SE E UNA PARABLA QUINDI QUADRATICA ECC
+par(mfrow=c(1,1))
+
+```
+
+
+
+#lm efetti log-quadratici 
+
+```{r}
+lm_ef_quadratici=lm(log(price+1) ~ carbody + drivewheel + cylindernumber + 
+                      aspiration + I(carwidth^2) + I(carheight^2) + I(boreratio^2) 
+                    + I(stroke^2)  + I(peakrpm^2)+I(citympg^2) , data=b_ms3)
+summary(lm_ef_quadratici)
+
+```
+
+#osservismo che i cambiamenti delle covariate al quadrato risulta solo non significativa stroke 
+```{r}
+lm_ef_quadratici2=lm(log(price+1) ~ carbody + drivewheel + cylindernumber + 
+                      aspiration + I(carwidth^2) + I(carheight^2) + I(boreratio^2) 
+                    + stroke  + I(peakrpm^2)+I(citympg^2) , data=b_ms3)
+summary(lm_ef_quadratici2)
+```
+
+
+
+#LM EFFETTIlog- CUBICI 
+
+```{r}
+lm_ef_cubici=lm(log(price+1) ~ carbody + drivewheel + cylindernumber + 
+                  aspiration + I(carwidth^2)+I(carwidth^3) + I(carheight^2) +I(carheight^3)+ 
+                  I(boreratio^2)+ I(boreratio^3)
+                + I(stroke^2)+I(stroke^3)  + I(peakrpm^2)+I(peakrpm^3)+
+                  I(citympg^2)+ I(citympg^3) , data=b_ms3)
+summary(lm_ef_cubici)
+
+
+
+summary(starting_model_log)$adj.r.squared
+summary(lm_ef_quadratici)$adj.r.squared
+summary(lm_ef_cubici)$adj.r.squared
+```
+
+
+
+
+#> summary(starting_model_log)$adj.r.squared
+#[1] 0.8770136                              #####MIGLIORE PER ADATTAMENTO effetto log lineare ####
+
+#> summary(lm_ef_quadratici)$adj.r.squared
+#[1] 0.8741618
+#> summary(lm_ef_cubici)$adj.r.squared
+#[1] 0.8925091
+
+#valuatre modelli diversi tra di loro 
+#modello logcubico vediamo che risultano non significative carwidth,carheight,stroke ,provismo a eliminare esponenti
+```{r}
+lm_ef_cubici2=lm(log(price+1) ~ carbody + drivewheel + cylindernumber + 
+                  aspiration +carwidth + carheight + 
+                  I(boreratio^2)+ I(boreratio^3)
+                + stroke  + I(peakrpm^2)+I(peakrpm^3)+
+                  I(citympg^2)+ I(citympg^3) , data=b_ms3)
+summary(lm_ef_cubici2)
+```
+#solo stroke risulta non significativa di nuovo invece height e width risultano significative 
+#proviamo a fare i grafici 
+
+
+```{r}
+par(mfrow=c(2,2)) 
+plot(lm_ef_quadratici2)
+par(mfrow=c(1,1))
+
+```
+
+
+
+```{r}
+
+par(mfrow=c(2,2)) 
+plot(lm_ef_cubici2)
+par(mfrow=c(1,1))
+```
+
+#### 4.  OUTLIERS ####
+
+```{r}
+library(car)
+influencePlot(starting_model_log,  main="Influence Plot", 
+              sub="Circle size is proportial to Cook's Distance" )
+
+cooksd <- cooks.distance(starting_model_log)
+cooksda=data.frame(cooksd)
+
+```
+
+
+#si osserva come le osservazioni 135 e 19  e 67presentano una alto valore di residui std e basso di cookds,laltra lato livello di cookds 
+
+# cutoff of cookD  4/(n-k).. NB n should be n used in the model!!!
+
+
+```{r}
+n_used=length(starting_model_log$residuals)
+n_used # controllare che sia lo stesso valore del totale delle osservazioni! 
+
+cutoff <- 4/(n_used-length(starting_model_log$coefficients)-2)
+cutoff
+b4_noInflu=data.frame(b_ms3[cooksd < cutoff, ])  # influential row numbers
+
+
+```
+
+
+
+
+#modello senza valori influenti 
+
+```{r}
+lm5 = lm(log(price+1) ~ carbody + drivewheel + cylindernumber + 
+           aspiration + carwidth + carheight + boreratio 
+         + stroke + peakrpm + citympg , data=b4_noInflu)#cerano rismaste enginiÃ¬esize e highway ,le ho tolte 
+summary(lm5)#r2 0.907 ,tutte significative tranne drivewheel e cylindernumber 
+
+par(mfrow=c(2,2)) 
+plot(starting_model3)
+
+par(mfrow=c(1,1))
+
+```
+
+
+
+
+
+
+#rimane un'osservazione isolata, CONTROLLARE!!!!!!!!!!!!!!!!!!!!!!!!!
+
+```{r}
+par(mfrow=c(2,2)) 
+plot(lm5)
+par(mfrow=c(1,1)) #modello lg-lin senza outlier presenta una buona linearita,quasi piatta ,buon grafico qqplot e poca etero ,pochissimi punti outlier 
+
+
+
+```
+
+
+
+
+
+
+
+#### Eteroschedasticità ####
+#Dopo aver analizzato i punti influenti e aver eliminato quelli con la Distanza di Cook maggiore della soglia, analizziamo uno dei punti più importanti del modello robusto: l'eteroschedasticità.
+#Per prima cosa, svolgiamo il test di Breusc-Pagan per vedere se vi è eteroschedasticità o meno.
+```{r}
+library(lmtest) 
+bptest(lm5)
+```
+
+# Si è ottenuto un valore del p-value non ancora sufficientemente elevato per rifiutare l'ipotesi di non eteroschedasticità.
+#Svolgiamo ora il Test di White, anch'esso verifica la presenza di eteroschedasticità come il test effettuato sopra, con la differenza che esso più conservativo e meno severo.
+
+```{r}
+library(car) 
+ncvTest(lm5)
+```
+#In questo caso vi è sufficiente evidenza empirica per rifiutare l'ipotesi nulla (presenza di eteroschedasticità). 
+#Nonostante i buoni risultati ottenuti con il Test di White, procediamo a correggere gli standard error con la formula degli s.e. corretti di White, in modo da ottenere un risultato migliore nel test di Breusch-Pagan.
+
+```{r}
+#library(lmSupport)
+#modelCorrectSE(lm5)
+```
+#NON FUNZIONA LMSUPPORT, ANCHE SE HO INSTALLATO L'ULTIMA VERSIONE DI RSTUDIO
+
+
+#MIGLIORA INTERCETTA VALORE STD ERROR ,ANCHE:
+#'cylindernumberfour 
+#'aspirationturbo     
+#'carwidth            
+#'carheight
+#'boreratio
+#'stroke
+#'peakrpm
+#'citympg            
+
+# compare p-values, using mle and white
+
+# mle
+
+```{r}
+#summary(lm5)$coefficients[,4]
+
+```
+
+# white standard error
+```{r}
+#cf=as.matrix(coeftest(lm5, vcov=vcovHC(lm5)) );cf
+
+```
+
+#SISTEMARE LA PARTE DALLA RIGA 789 ALLA RIGA 820 (non va il pacchetto) :(  :(  :(
+
+###6.  BOOTSTRAP: verifica dei parametri per la stima puntuale (e del modello in generale)
+
+```{r}
+lm5_boot = lm(log(price+1) ~ carbody + drivewheel + cylindernumber + 
+                aspiration + carwidth + carheight + boreratio 
+              + stroke + peakrpm + citympg , data=b4_noInflu)
+summary(lm5_boot)
+residual_lm5_boot= data.frame(lm5_boot$residuals);
+used_lm5_boo=b4_noInflu[row.names(residual_lm5_boot),]
+```
+```{r}
+lm5_boot2 = lm(log(price+1) ~ carbody + drivewheel + cylindernumber + 
+                 aspiration + carwidth + carheight + boreratio 
+               + stroke + peakrpm + citympg , data=used_lm5_boo)
+
+summary(lm5_boot2)#Multiple R-squared:  0.907
+
+drop1(lm5_boot2,test='F')
+```
+
+```{r}
+library("car")
+BOOT.MOD_lm5_b2=Boot(lm5_boot2, R=1999)
+summary(BOOT.MOD_lm5_b2, high.moments=TRUE)
+```
+#Dopo aver usato la procedura Bootstrap, creiamo i grafici per verificare la significatività delle variabili.
+#Si ricordi che la significatività degli intervalli di confidenza è da controllare per le variabili numeriche, mentre non è così affidabile per le variabili factor.
+
+```{r}
+ci_perc <- Confint(BOOT.MOD_lm5_b2, level=c(.95), type="perc")
+hist(BOOT.MOD_lm5_b2, legend="separate")
+```
+#Si osserva che vi sono due variabili non significative per Bootstrapp: stroke e peakrpm.
+
+#Proviamo a stimare tre modelli: il primo senza la variabile "stroke", il secondo senza la variabile "peakrpm" e il terzo senza entrambe le variabili. 
+#poi mettiamo a confronti i grafici di diagnostica e il valore di R quadro aggiustato.
+
+```{r}
+mod_nostroke <- lm(log(price+1) ~ carbody + drivewheel + cylindernumber + 
+                 aspiration + carwidth + carheight + boreratio 
+                + peakrpm + citympg , data=used_lm5_boo)
+mod_nopeakrpm <- lm(log(price+1) ~ carbody + drivewheel + cylindernumber + 
+                 aspiration + carwidth + carheight + boreratio 
+               + stroke + citympg , data=used_lm5_boo)
+mod_nostr_nopeak <- lm(log(price+1) ~ carbody + drivewheel + cylindernumber + 
+                 aspiration + carwidth + carheight + boreratio + citympg , data=used_lm5_boo)
+summary(mod_nostroke)
+summary(mod_nopeakrpm)
+summary(mod_nostr_nopeak)
+```
+#R_quadro_adj del modello senza "stroke": 0.896
+#R_quadro_adj del modello senza "peakrpm": 0.896
+#R_quadro_adj del modello senza "stroke" e "peakrpm": 0.985
+#R_quadro_adj del modello con "stroke" e "peakrmp": 0.898
+
+#Osserviamo che non vi sono sostanziali differenze tra i vari modelli, quello con l'r quadro aggiustato maggiore è il modello che mantiene le due variabili non significative per Bootstrap.
+
+#Osserviamo ora i plot di diagnostica per vedere se vi sono delle differenze sostanziali tra i modelli.
+
+```{r}
+par(mfrow=c(2,2))
+plot(mod_nostroke)
+par(mfrow=c(1,1))
+
+par(mfrow=c(2,2))
+plot(mod_nopeakrpm)
+par(mfrow=c(1,1))
+
+par(mfrow=c(2,2))
+plot(mod_nostr_nopeak)
+par(mfrow=c(1,1))
+
+par(mfrow=c(2,2))
+plot(lm5_boot2)
+par(mfrow=c(1,1))
+
+
+```
+#Non osserviamo nessuna differenza sostanziale nei grafici di diagnostica, quindi decidiamo di mantenere all'interno del modello entrambe le variabili.
+#Svolgiamo l'ultima analisi circa tutte le assunzioni principali del modello.
+
+```{r}
+library(gvlma)
+gvlma(lm5_boot2)
+
+```
+#Tutte le assunzioni sono accettate, possiamo ritenere questo modello quello definitivo!
+
+#Confronto modello iniziale vs modello finale
+```{r}
+par(mfrow=c(2,2))
+plot(fit)
+par(mfrow=c(1,1))
+
+par(mfrow=c(2,2))
+plot(lm5_boot2)
+par(mfrow=c(1,1))
+```
+Osserviamo delle notevoli differenze in tutti e quattro i grafici di diagnostica, soprattutto con le procedure utilizzate, abbiamo migliorato la linearità e l'eteroschedasticità dei residui.
