@@ -1,0 +1,326 @@
+---
+title: "tesina_04_11_2021"
+author: "millone"
+date: "4/11/2021"
+output: word_document
+---
+```{r}
+options(scipen=999) #togliamo notazione scientifica
+library(readr)
+CarPrice_Assignment <- read_csv("CarPrice_Assignment.csv") #leggiamo il file
+b <- CarPrice_Assignment
+```
+
+
+
+
+#abbiamo tolto enginetype enginelocation doornumber perche varibili confondenti 
+
+# vediamo le statistiche descrittive per farci un'idea generale
+
+```{r}
+summary(b)
+
+```
+
+
+
+####0.  PER UNA CORRETTA VISIONE DEL TIPO DELLE VARIBILI CHECK MISSING DATA####
+
+```{r}
+library(funModeling)
+library(dplyr)
+
+```
+
+
+# SEE types of vars
+
+```{r}
+status=df_status(b, print_results = F)
+status #ci permette di vedere le tipologie delle varibili ,cosi da verificare la loro congrtuneza 
+
+```
+
+
+#'status mostra la percentuale di dati mancanti ,che se dovessero superare il 20 % bisogna elidere 
+#'covariate 
+
+#controlliamo che le variabili siano correttamente divise in numeric e factor
+# variabile SYMBOLING e fueltype carname aspiration doornumber carbody drivewheel enginelocation enginetype cylendernumber fuelsystem , trasformata in fattore da variabile numerica
+```{r}
+
+b$symboling=as.factor(b$symboling)
+class(b$symboling)
+summary(b$symboling)
+
+b$CarName=as.factor(b$CarName)
+class(b$symboling)
+
+b$fueltype=as.factor(b$fueltype)
+class(b$fueltype)
+
+b$aspiration=as.factor(b$aspiration)
+class(b$aspiration)
+
+b$doornumber=as.factor(b$doornumber)
+class(b$doornumber)
+
+b$carbody=as.factor(b$carbody)
+class(b$carbody)
+
+b$drivewheel=as.factor(b$drivewheel)
+class(b$drivewheel)
+
+b$enginelocation=as.factor(b$enginelocation)
+class(b$enginelocation)
+
+b$enginetype=as.factor(b$enginetype)
+class(b$enginetype)
+
+b$cylindernumber=as.factor(b$cylindernumber)
+class(b$cylindernumber)
+
+b$fuelsystem=as.factor(b$fuelsystem)
+class(b$fuelsystem)
+
+```
+
+
+
+```{r}
+
+b1 <- b[, -c(6,9,15)]#ABBIAMO TOLTO VARIBILi doornumber, enginelocation, enginetype 
+statusb1=df_status(b1, print_results = F)
+statusb1
+```
+
+
+
+
+
+#controlliamo i livelli della variabile symboling, assicurandoci che sia factor
+
+
+
+```{r}
+fit = lm(price ~ . , data=b1)
+summary(fit)
+```
+
+
+
+
+#possiamo commentare se 1 e 3 quartile sono simmetrici con valori  che dovrebbero essere [-3;3] 
+#' si aspetta rispettano l'ipotesi di una distrib **normale_std** e mediana prossima a 0 
+#' 2 il range da min a max (se cadono in un range ipotetico/teorico per esempio tra -3 e 3 )
+#' ,max ÃÂÃÂ¨ leggermentesuperiore a 3 
+#'1 .l'intercetta(var. risposta) vale 4(score) quando covariate uguali
+#' a o ,il punteggio risulta 4 quando il num studenti e il profitto sono nulli
+
+
+#fittato il modello con tutte le variabili, si decide di eliminare la variabile ID, 
+#CarName (poichÃÂ¨ non ÃÂ¨ il nome della marca, bensÃÂ¬ il modello dell'automobile). 
+#Si osserva la presenza di alta collinearitÃÂ  fra le singole covariate, 
+#infatti R quadro ÃÂ¨ molto alto (vicino a 1,0.9978), mentre quasi tutte le variabili 
+#sono non #significative.
+
+```{r}
+b2 <- b1[, -c(1,3)] #elimiamo le variabili carname e car_id.
+statusb2=df_status(b2, print_results = F)
+statusb2
+length(fit$residuals)
+nrow(b2)#205 corrisponde a 205 
+```
+
+#####MODELLO LOGISTICO
+
+```{r}
+plot(b$price, ylab="Price")
+abline(h=20000, col="red")
+abline(h=15000, col="blue")
+skimr::skim(b$price)
+c <- b2
+c$target <- ifelse(c$price > 15000, 1,0)
+table(c$target)
+c$target <- as.factor(c$target)
+str(c$target)
+
+prop.table(table(c$target))
+
+```
+```{r}
+c2 <- c[, -c(21)] #togliamo la ex variabile target (ora binarizzata)
+glm1 <- glm(target~. , data=c2, family="binomial") #primo modello logistico
+summary(glm1)
+```
+Il modello non da errore, ma l'output non sembra essere molto affidabile poichè tutte le variabili risultano significative, hanno tutte lo stesso p-value.
+Iniziamo a controllare le varie problematiche, per capire quale sia la causa.
+```{r}
+#calcoliamo la varianza delle variabili numeriche e fattoriali
+#FATTORIALI
+library(dplyr)
+fac <- c2%>% dplyr::select_if(is.factor)#comando comodo perche viene la stessa cosa di factordata
+
+
+sapply(fac, function(x) length(levels(x)))#ce anche variabile proice dipendente 
+
+#NUMERICHE
+numeric <- c2%>% dplyr::select_if(is.numeric)#si fa con unico comnado perche tanto viene come numdata
+sapply(numeric, function(x) var(x))#con option=999 tolgo scrittura scientifica tipo 4*e alla -30
+```
+Nessuna variabile presenta zero variance, il problema è da un'altra parte.
+
+
+Analizziamo la correlazione fra le numeriche
+```{r}
+library(PerformanceAnalytics)
+chart.Correlation(numeric, histogram=TRUE, pch=19)
+```
+Si osservano valori molto alti tra la variabile 'ciytmpg' e 'highwaympg', giustamente correlate poichè rappresentano rispettivamente il numero di km fatti in città e in autostrada; si decide di eliminare la variabile 'highway'.
+
+Altre variabili fortemente correlate sono quelle relative alle dimensioni della macchina; wheelbase (passo della macchina), carlength (lunghezza della macchina), carweight(peso della macchina), carwidth (larghezza della macchina). Si decide di eliminare la variabile peso e la variabile lunghezza.
+
+Ricalcoliamo le correlazioni, dopo aver eliminato le variabili maggiormente correlate per vedere se la situazione è migliorata.
+```{r}
+c3 <- c2[, -c(7,10,20)]
+library(PerformanceAnalytics)
+numeric2 <- c3%>% dplyr::select_if(is.numeric)
+chart.Correlation(numeric2, histogram=TRUE, pch=19)
+```
+Si osservano ancora alcuni valori elevati di correlazione (tra 'horsepower' e 'citympg' e 'enginesize'). Quindi, si decide di eliminare le variabili 'horsepower' e 'carwidth' poichè fortemente correlate con altre variabili. 
+
+Verifichiamo il valore di VIF e TOL delle covariate numeriche rimaste.
+```{r}
+c4 <- c3[, -c(7,15)]
+numeric3 <- c4%>% dplyr::select_if(is.numeric)
+y = as.numeric(c4$target)
+x<-numeric3
+X=as.matrix(x)
+
+library(mctest)
+mod <- lm(y~X)
+imcdiag(mod)
+```
+Tutte le covariate rispettano le soglie previste sia per VIF (<5) sia per il TOL (>0.3).
+
+Stimiamo il modello dopo aver tolto le variabili fortemente correlate, testiamo la significatività delle variabili con il test LRT.
+```{r}
+glm2 <- glm(target~., data=c4, family="binomial")
+summary(glm2)
+drop1(glm2, test="LRT")
+```
+
+Il modello converge, ma vi sono molte variabili non significative (per il test LRT), si procede con il calcolare il chi quadro normalizzato fra le variabili factor al fine di controllare quali siano i valori maggiormente elevati ed eliminare quelle variabili.
+
+
+Calcoliamo l'associazione tra le variabili factor [mettere output da uno scrit R]
+
+#combos <- combn(ncol(fac),2)
+#library(plyr)
+#adply(combos, 2, function(x) {
+#  test <- chisq.test(fac[, x[1]], fac[, x[2]])
+#  tab  <- table(fac[, x[1]], fac[, x[2]])
+#  out <- data.frame("Row" = colnames(fac)[x[1]]
+#                   , "Column" = colnames(fac[x[2]])
+#                   , "Chi.Square" = round(test$statistic,3)
+#                   , "df"= test$parameter
+#                    , "p.value" = round(test$p.value, 3)
+#                    , "n" = sum(table(fac[,x[1]], fac[,x[2]]))
+#                    , "u1" =length(unique(fac[,x[1]]))-1
+#                    , "u2" =length(unique(fac[,x[2]]))-1
+#                    , "nMinu1u2" =sum(table(fac[,x[1]], fac[,x[2]]))* min(length(unique(fac[,x[1]]))-1 , length(unique(fac[,x[2]]))-1) 
+#                    , "Chi.Square norm"  =test$statistic/(sum(table(fac[,x[1]], fac[,x[2]]))* min(length(unique(fac[,x[1]]))-1 , length(unique(fac[,x[2]]))-1)) 
+#  )
+  
+  
+#  return(out)
+  
+#}) 
+
+
+Si osserva che vi è chi-quadro normalizzato pari a 1 tra le variabili 'fuelsystem' e 'fueltype', si decide di eliminare la variabile 'fuelsystem' poichè ai fini interpretativi la variabile fueltype (tipo di carburante della vettura: benzina, diesel o gas) è più interessante e utile.
+
+Ora ristimiamo il modello e analizziamo le significatività con il test LRT.
+
+```{r}
+c5 <- c4[,-c(10)]
+glm3 <- glm(target~., data=c5, family="binomial")
+summary(glm3)
+drop1(glm3, test="LRT")
+```
+La situazione migliora, ma ancora tante variabili non sono significative.
+
+
+
+
+Svolgiamo la procedura StepAIC
+```{r}
+library(MASS)
+stepAIC(glm3, direction="both")
+```
+
+Stimiamo il modello che ci ha proposto la procedura AIC e osserviamo quali variabili sono significative per il test LRT.
+```{r}
+glm4 <- glm(target ~ symboling + carbody + drivewheel + wheelbase + enginesize + 
+    stroke + compressionratio + citympg, family = "binomial", data = c5)
+summary(glm4)
+drop1(glm4, test="LRT")
+```
+Il modello converge dopo 9 iterazioni; tutte le variabili sono signifiative per il test LRT. 
+#####PRIMO MODELLO
+
+
+Controlliamo correlazione fra le variabili scelte dalla procedura Step.
+```{r}
+library(PerformanceAnalytics)
+library(dplyr)
+numeric5 <- c5 %>% dplyr::select_if(is.numeric)
+chart.Correlation(numeric5, histogram=TRUE, pch=19)
+```
+Non vi sono valori altissimi, controlliamo i valori di Vif e Tol.
+```{r}
+y = as.numeric(c5$target)
+x<-numeric5
+X=as.matrix(x)
+
+library(mctest)
+mod <- lm(y~X)
+imcdiag(mod)
+```
+I valori rispettano tutte le soglie.
+
+Controlliamo quasi separation
+```{r}
+table(c5$target, c5$symboling) 
+table(c5$target, c5$fueltype)
+table (c5$target, c5$carbody)
+table (c5$target, c5$aspiration)
+```
+Non c'è separation fra la variabile target e le singole covariate factor.
+
+```{r}
+R_2_glm4 <- 1 - (57.602/254.547); R_2_glm4
+```
+
+
+#### SECONDO MODELLO
+Proviamo a fittare un nuovo modello, dopo aver eliminato le variabili "stroke" e "compression ratio", relative a tre parametri tecnici del motore, poco utili ai fini dell'interpretazione. Analizziamo i risultati ottenuti.
+
+```{r}
+c6 <- c5[,-c(10,11,12)]
+glm5 <- glm(target ~ symboling + carbody + drivewheel + wheelbase + enginesize +  citympg,                  family = "binomial", data = c6)
+summary(glm5)
+drop1(glm5, test="LRT")
+```
+Otteniamo un modello con meno covariate rispetto al precedente, quindi, avente un'interpretazione più semplice, mantenendo sempre tutte le variabili significative.
+
+```{r}
+R_2_glm5 <- 1 - (74.197/254.547); R_2_glm5
+```
+
+
+
+
+
+
