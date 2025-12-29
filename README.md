@@ -1,11 +1,11 @@
-# 📊 Predictive Modeling, AI, Machine Learning, NLP & XAI Data Science Projects
+# 🎓 Predictive Modeling, AI, Machine Learning, NLP & XAI Data Science Projects
 
 Repository che raccoglie i principali progetti accademici e applicativi sviluppati nell’ambito di **Machine Learning, Deep Learning, NLP, LLM, Explainable AI (XAI) e Statistica Computazionale**.  
 I progetti sono organizzati per area tematica e includono sia applicazioni su dati reali sia studi metodologici.
 
 ---
 
-## 🧠 LLM, NLP, XAI & Recommendation Systems
+## 📁 LLM, NLP, XAI & Recommendation Systems
 
 ### 📚 BookMates – Recommendation System per Compagni di Lettura
 **Sistema di raccomandazione di libri basato su NLP e Deep Learning**
@@ -54,7 +54,7 @@ Il progetto evidenzia il potenziale dell’AI nel supporto alle decisioni clinic
 
 ---
 
-## 📈 Modelli Predittivi & Machine Learning
+## 📁 Modelli Predittivi & Machine Learning
 
 ### 🥗 Classificazione del Livello di Obesità
 **Modelli di Machine Learning su dati comportamentali e antropometrici**
@@ -123,5 +123,5 @@ Il progetto unisce **statistica classica e computazionale**, con particolare att
 - **Data Visualization & Data Analysis**
 
 ---
-
-📌 *Questa repository rappresenta un percorso di studio e ricerca focalizzato sull’utilizzo dei dati e dell’intelligenza artificiale per supportare decisioni complesse in ambito sanitario, economico e sociale.*
+## 👤Author
+**Andrea Millone**
