@@ -1,4 +1,4 @@
-# 📊 Academic & Data Science Projects
+# 📊 Predictive Modeling, AI, Machine Learning, NLP & XAI Data Science Projects
 
 Repository che raccoglie i principali progetti accademici e applicativi sviluppati nell’ambito di **Machine Learning, Deep Learning, NLP, LLM, Explainable AI (XAI) e Statistica Computazionale**.  
 I progetti sono organizzati per area tematica e includono sia applicazioni su dati reali sia studi metodologici.
