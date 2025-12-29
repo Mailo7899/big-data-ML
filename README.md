@@ -118,7 +118,7 @@ Il progetto unisce **statistica classica e computazionale**, con particolare att
 - **Python, R**
 - **scikit-learn, TensorFlow, Keras, PyTorch**
 - **NLP & Transformers (HuggingFace)**
-- **Explainable AI **
+- **Explainable AI**
 - **Statistica Computazionale**
 - **Data Visualization & Data Analysis**
 
